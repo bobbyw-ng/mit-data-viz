@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>D3 Interactions & Transitions</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+	<script src="https://d3js.org/topojson.v2.min.js"></script>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+    <style>
+
+	#buttons{
+		padding-left: 120px;
+		position:absolute;
+	}
+ 	</style>
+</head>
+
+<body>
+	<h1>City of Boston 311 Requests by Neighborhood</h1>
+	<div id="buttons">
+		<button class = "btn-sm btn-primary" onclick="update(roslindale);update_map('Roslindale')">Roslindale</button>
+		<button class = "btn-sm btn-primary" onclick="update(south_boston_waterfront);update_map('South Boston Waterfront')">South Boston Waterfront</button>
+		<button class = "btn-sm btn-primary" onclick="update(back_bay);update_map('Back Bay')">Back Bay</button>
+		<button class = "btn-sm btn-primary" onclick="update(jamaica_plain);update_map('Jamaica Plain')">Jamaica Plain</button>
+	</div>
+	<div id="chart"></div>
+</div>	
+	  
+<script type="text/javascript">
+	
+	var bos311Url = "https://gist.githubusercontent.com/cesandoval/046a91586ae76889aeb5b3e9db53016e/raw/ffb0c410ce8503c8c839cde01235bafb39cb14ad/bostosn_311.csv"
+	var bosNeighborUrl='https://gist.githubusercontent.com/cesandoval/09b2e39263c748fbcb84b927cecc7c46/raw/ab71d3638efd2545ec99c2651c6f2ddcea9d2a07/boston.json'
+
+	var roslindale = [["Citizens_Connect_App", 2312], ["City_Worker_App", 559], ["Constituent_Call", 3432], ["Employee_Generated", 396], ["twitter", 13], ["Self_Service", 611]]
+	var south_boston_waterfront = [["Citizens_Connect_App", 622], ["City_Worker_App", 21], ["Constituent_Call", 287], ["Employee_Generated", 23], ["twitter", 4], ["Self_Service", 21]]
+	var back_bay = [["Citizens_Connect_App", 4553], ["City_Worker_App", 579], ["Constituent_Call", 2255], ["Employee_Generated", 405], ["twitter", 13], ["Self_Service", 240]]
+	var jamaica_plain = [["Citizens_Connect_App", 5008], ["City_Worker_App", 683], ["Constituent_Call", 5522], ["Employee_Generated", 427], ["twitter", 16], ["Self_Service", 909]]
+
+	// Define height and width variables
+	var margin = {top: 20, right: 20, bottom: 80, left: 80},
+		width = 600 - margin.left - margin.right,
+		height = 620 - margin.top - margin.bottom;
+
+	// Add an SVG element
+	var svg = d3.select("div#chart")
+		.append("svg")
+			.attr("width", width * 2 + margin.left + margin.right)
+			.attr("height", height + margin.bottom + margin.top)
+		.append("g")
+			.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+	
+	// Add X axis
+	var x = d3.scaleBand()
+		.range([0,width])
+		.domain(roslindale.map(function(d) { return d[0].replaceAll("_", " ")}))
+		.padding(0.2);
+	svg.append("g")
+		.attr("transform", "translate(0," + height + ")")
+		.call(d3.axisBottom(x))
+		.selectAll("text")
+			.attr("transform", "translate(-10,0)rotate(-45)")
+			.style("text-anchor", "end")
+
+	// Add Y axis
+	var y = d3.scaleLinear()
+		.domain([0, 6000])
+		.range([height, 0]);
+	svg.append("g")
+		.call(d3.axisLeft(y));
+	svg.append("text")
+		.attr("transform", "rotate(-90)")
+		.attr("x", 0 - (height / 2))
+		.attr("y", 0 - (margin.left / 2 + 20))
+		.attr("text-anchor", "middle")
+		.text("Number of requests")
+
+	// define projection
+	var albersProjection = d3.geoAlbers()
+		.scale(190000)
+		.rotate([71.057,0])
+		.center([0,42.313])
+		.translate([width/2 + margin.left, height/2 + margin.top])
+	var geoPath = d3.geoPath()
+		.projection(albersProjection)
+
+	// Add map
+	var map = svg.append("g")
+	d3.json(bosNeighborUrl).then(function(bosNeighbor){
+		var topodata = topojson.feature(bosNeighbor, bosNeighbor.objects.boston_neigh)
+		map
+		.attr("transform", "translate(" + width + ",0)")
+		.selectAll("path")
+		.data(topodata.features)
+		.enter()
+		.append("path")
+			.attr("fill", "#ccc")
+			.attr("stroke", "white")
+			.attr("d",geoPath);
+		})
+
+	var Tooltip = d3.select('div#chart')
+		.append('div')
+		.style("opacity:", 0)
+		.attr("class", "tooltip")
+		.style("position","absolute")
+		.style('background-color','white')
+		.style('padding','5px')
+	
+	var mouseover = function(d) {
+		Tooltip
+			.style("opacity", 1)
+		d3.select(this)
+			.style("fill", "yellow")
+	}
+	var mousemove = function(d){
+		Tooltip
+			.html(d[0].replaceAll("_", " ") + ": " + d[1])
+			.style("left", (d3.mouse(this)[0] + 100) + "px")
+			.style("top", (d3.mouse(this)[1]) + "px")
+	}
+	var mouseleave = function(d){
+		Tooltip
+			.style("opacity", 0)
+		d3.select(this)
+			.style("fill", "3caea3")
+	}
+
+	function update(data) {
+		var u = svg.selectAll("rect")
+			.data(data)
+		u
+			.enter()
+			.append("rect")
+				.on("mouseover", mouseover)
+				.on("mousemove", mousemove)
+				.on("mouseleave", mouseleave)
+			.merge(u)
+			.transition()
+			.duration(2000)
+				.attr("x", function(d) { return x(d[0].replaceAll("_", " ")); })
+				.attr("y", function(d) { return y(d[1]); })
+				.attr("width", x.bandwidth())
+				.attr("height", function(d) { return height - y(d[1])})
+				.attr("fill", "#3caea3")
+				.style("opacity", 0.6);
+	}
+
+	function update_map(neighborhood){
+		map.selectAll("path")
+			.transition()
+			.duration(2000)
+				.attr("fill", function(d){
+					if(d.properties.Name == neighborhood){
+						return "yellow"
+					}
+					else{
+						return "#3caea3"
+					}
+			})
+
+	}
+
+	// // update(roslindale)
+	// update_map('Roslindale')
+</script>
+</body>
+</html>
